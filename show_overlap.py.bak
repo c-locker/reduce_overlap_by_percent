@@ -1,0 +1,69 @@
+#
+#
+# show_overlap.py
+# 
+# print the overlap between at least to cameras
+#
+# Paul Pelletier, 2021 (https://www.agisoft.com/forum/index.php?topic=13332.0)
+# 
+# adapted by Christoph Locker 2024
+#
+
+
+import Metashape
+import itertools
+import math
+from shapely.geometry import Polygon
+
+chunk = Metashape.app.document.chunk
+T = chunk.transform.matrix
+cameras_sel = [camera for camera in chunk.cameras if camera.selected]
+
+if len(cameras_sel) < 2:
+	raise Exception("Must select at least 2 images!")
+
+# choose surface model
+if chunk.model:
+    surface = chunk.model
+elif chunk.dense_cloud:
+    surface = chunk.dense_cloud
+else:
+    surface = chunk.point_cloud
+
+for cam1,cam2 in itertools.combinations(cameras_sel, 2):
+    ver1 = list()
+    shape_ver1 = list()
+    ver2 = list()
+    shape_ver2 = list()
+    w = cam1.sensor.width
+    h = cam1.sensor.height
+    cuadro = Polygon([(0,0),(w,0),(w,h),(0,h)])
+    for (x, y) in [[0, 0], [w - 1, 0], [w - 1, h - 1], [0, h - 1]]:
+        ray_origin = cam1.unproject(Metashape.Vector([x, y, 0]))
+        ray_target = cam1.unproject(Metashape.Vector([x, y, 1]))
+        ver1.append(surface.pickPoint(ray_origin, ray_target))
+        if not ver1[-1]:
+            ver1[-1] = chunk.point_cloud.pickPoint(ray_origin, ray_target)
+    for (x, y) in [[0, 0], [w - 1, 0], [w - 1, h - 1], [0, h - 1]]:
+        ray_origin = cam2.unproject(Metashape.Vector([x, y, 0]))
+        ray_target = cam2.unproject(Metashape.Vector([x, y, 1]))
+        ver2.append(surface.pickPoint(ray_origin, ray_target))
+        if not ver2[-1]:
+            ver2[-1] = chunk.point_cloud.pickPoint(ray_origin, ray_target)
+    for vertex in ver1:	
+        if not cam2.project(vertex):
+        	continue
+        x = round(cam2.project(vertex).x,3)
+        y = round(cam2.project(vertex).y,3)
+        shape_ver1.append((x,y))           
+    p1 = Polygon(shape_ver1)
+    for vertex in ver2:	
+        if not cam1.project(vertex):
+        	continue
+        x = round(cam1.project(vertex).x,3)
+        y = round(cam1.project(vertex).y,3)
+        shape_ver2.append((x,y))           
+    p2 = Polygon(shape_ver2)   
+    print("{} overlaps with {} at {:.2f} %  ".format(cam1.label,cam2.label,100*(p1.intersection(cuadro).area/cuadro.area)))
+    print("{} overlaps with {} at {:.2f} %  ".format(cam2.label,cam1.label,100*(p2.intersection(cuadro).area/cuadro.area)))
+print("Script completed!")

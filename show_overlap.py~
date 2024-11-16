@@ -1,0 +1,98 @@
+################################################################################
+#
+# show_overlap.py
+# 
+# print the overlap between two cameras
+#
+# parts of the code taken from Paul Pelletier, 2021 
+# (https://www.agisoft.com/forum/index.php?topic=13332.0)
+# 
+# Christoph Locker 2024
+#
+################################################################################
+
+
+import Metashape
+import math
+from shapely.geometry import Polygon
+
+# TODO: 
+# - choose adjustments to alghorithm
+#
+
+def overlap(cam1, cam2):
+    """ calculates overlap of two cameras.
+
+    cam1, cam2: Metashape.Camera
+    returns: float
+    """
+    w = cam1.sensor.width
+    h = cam1.sensor.height
+    sensor_rect = Polygon([(0,0),(w,0),(w,h),(0,h)])
+
+    corners1 = []
+    shape_corners1 = []
+    corners2 = []
+    shape_corners2 = []
+
+    # pick surface point for all four corners of camera sensor
+    # camera 1:
+    for (x, y) in [[0, 0], [w - 1, 0], [w - 1, h - 1], [0, h - 1]]:
+        ray_origin = cam1.unproject(Metashape.Vector([x, y, 0]))# same as 
+                                                                # cam.center
+        ray_target = cam1.unproject(Metashape.Vector([x, y, 1]))
+        corner = surface.pickPoint(ray_origin, ray_target)
+        if not corner:
+            break
+        corners1.append(corner)
+
+    # camera 2:
+    for (x, y) in [[0, 0], [w - 1, 0], [w - 1, h - 1], [0, h - 1]]:
+        ray_origin = cam2.unproject(Metashape.Vector([x, y, 0]))
+        ray_target = cam2.unproject(Metashape.Vector([x, y, 1]))
+        corners2.append(surface.pickPoint(ray_origin, ray_target))
+
+    for vertex in corners1:	
+        if not cam2.project(vertex):
+        	continue
+        x = round(cam2.project(vertex).x,3)
+        y = round(cam2.project(vertex).y,3)
+        shape_corners1.append((x,y))           
+
+    poly1 = Polygon(shape_corners1)
+
+    for vertex in corners2:	
+        if not cam1.project(vertex):
+        	continue
+        x = round(cam1.project(vertex).x,3)
+        y = round(cam1.project(vertex).y,3)
+        shape_corners2.append((x,y))           
+
+    poly2 = Polygon(shape_corners2)   
+
+    return poly1.intersection(sensor_rect).area/sensor_rect.area
+
+if __name__ == '__main__':
+    # TODO: make argument to function? or leave as below?
+    # choose surface model
+    #if chunk.model:
+    #    surface = chunk.model
+    #elif chunk.dense_cloud:
+    #    surface = chunk.dense_cloud
+    #else:
+    #    surface = chunk.point_cloud
+    surface = chunk.tie_points
+
+    chunk = Metashape.app.document.chunk
+
+    T = chunk.transform.matrix
+
+    cameras_sel = [camera for camera in chunk.cameras if camera.selected]
+
+    if len(cameras_sel) != 2:
+	    raise Exception("Must select exactly 2 images!")
+    
+    for i in range(len(cameras_sel)-1):
+        overlap(cameras_sel[i], cameras_sel[i+1])
+
+    print("Script completed!")
