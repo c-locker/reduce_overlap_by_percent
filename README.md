@@ -4,7 +4,7 @@
 
 Usage:
 
-    reduce\_overlap\_by\_percent.py --overlap \[--margin\¸]
+    reduce_overlap_by_percent.py --overlap [--margin]
 
     --overlap: (required) desired overlap in percent
     --margin: (optional) margin to desired overlap, default = 2
